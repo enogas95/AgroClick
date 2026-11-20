@@ -1,0 +1,1518 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>AgroClick - Fattoria Incrementale</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Fredoka & Nunito per un look da gioco mobile caldo e leggibile -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+  <!-- Tone.js per effetti sonori procedurali leggeri (opzionali) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      font-family: 'Nunito', sans-serif;
+      background-color: #fef3c7;
+      background-image: radial-gradient(#fde68a 1.5px, transparent 1.5px);
+      background-size: 20px 20px;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      height: 100dvh;
+      display: flex;
+      justify-content: center;
+    }
+
+    h1, h2, h3, .font-game {
+      font-family: 'Fredoka', sans-serif;
+    }
+
+    /* Contenitore principale mobile-first centrato su schermi grandi */
+    #app-container {
+      width: 100%;
+      max-width: 480px;
+      height: 100dvh;
+      background: linear-gradient(180deg, #e0f2fe 0%, #f0fdf4 35%, #fefce8 100%);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      box-shadow: 0 0 30px rgba(0, 0, 0, 0.15);
+      overflow: hidden;
+    }
+
+    /* Terreno e zolle */
+    .soil-plot {
+      background: linear-gradient(145deg, #78350f, #5c280b);
+      border: 3px solid #451a03;
+      border-radius: 14px;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.2s;
+      box-shadow: inset 0 4px 8px rgba(0, 0, 0, 0.45), 0 3px 0 #3a1502;
+      touch-action: none; /* Permette lo swipe fluido sopra il campo */
+    }
+
+    .soil-plot.mature {
+      border-color: #facc15;
+      box-shadow: inset 0 0 12px rgba(250, 204, 21, 0.45), 0 3px 0 #854d0e;
+      animation: pulseMature 1.6s infinite ease-in-out;
+    }
+
+    .soil-plot:active, .soil-plot.harvested-anim {
+      transform: scale(0.91);
+    }
+
+    @keyframes pulseMature {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.03); }
+    }
+
+    /* Animazione pianta che cresce */
+    .crop-emoji {
+      transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+      filter: drop-shadow(0 3px 3px rgba(0,0,0,0.35));
+      pointer-events: none;
+    }
+
+    /* Pulsanti 3D stile gioco */
+    .btn-game {
+      transition: all 0.1s ease;
+      position: relative;
+      top: 0;
+    }
+    .btn-game:active:not(:disabled) {
+      top: 3px;
+      box-shadow: 0 1px 0 rgba(0,0,0,0.3) !important;
+    }
+    .btn-game:disabled {
+      opacity: 0.55;
+      filter: grayscale(0.4);
+      cursor: not-allowed;
+    }
+
+    /* Numeri volanti */
+    .floating-text {
+      position: fixed;
+      pointer-events: none;
+      font-family: 'Fredoka', sans-serif;
+      font-weight: 700;
+      z-index: 100;
+      text-shadow: 0 2px 0 rgba(0,0,0,0.5), 0 0 6px rgba(255,255,255,0.8);
+      animation: floatUp 0.95s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @keyframes floatUp {
+      0% {
+        opacity: 1;
+        transform: translate(-50%, 0) scale(0.7);
+      }
+      25% {
+        transform: translate(-50%, -18px) scale(1.15);
+      }
+      100% {
+        opacity: 0;
+        transform: translate(-50%, -65px) scale(0.95);
+      }
+    }
+
+    /* Particelle raccolto */
+    .particle {
+      position: fixed;
+      pointer-events: none;
+      z-index: 95;
+      animation: particleBurst 0.65s ease-out forwards;
+    }
+
+    @keyframes particleBurst {
+      0% {
+        opacity: 1;
+        transform: translate(0, 0) scale(1) rotate(0deg);
+      }
+      100% {
+        opacity: 0;
+        transform: translate(var(--dx), var(--dy)) scale(0.3) rotate(180deg);
+      }
+    }
+
+    /* Scrollbar pulita per i tab */
+    .custom-scroll::-webkit-scrollbar {
+      width: 5px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+      background: rgba(0,0,0,0.04);
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: rgba(120, 53, 15, 0.25);
+      border-radius: 10px;
+    }
+
+    /* Animazione falce/strumento */
+    @keyframes swingTool {
+      0% { transform: rotate(0deg) scale(1); }
+      30% { transform: rotate(-35deg) scale(1.25); }
+      70% { transform: rotate(25deg) scale(1.15); }
+      100% { transform: rotate(0deg) scale(1); }
+    }
+    .swing-anim {
+      animation: swingTool 0.3s ease-in-out;
+    }
+  </style>
+</head>
+<body>
+
+<div id="app-container">
+  <!-- HEADER: Valute, Semi d'Oro, Audio e Impostazioni -->
+  <header class="bg-gradient-to-r from-emerald-700 via-green-600 to-emerald-700 text-white px-3 py-2.5 shadow-md z-20 flex items-center justify-between border-b-4 border-emerald-800">
+    <div class="flex items-center gap-2">
+      <div class="bg-amber-400 text-amber-950 w-9 h-9 rounded-xl flex items-center justify-center text-xl shadow-inner border-2 border-amber-200 font-bold">
+        🚜
+      </div>
+      <div>
+        <h1 class="text-lg leading-none font-bold tracking-wide text-amber-100 drop-shadow">AgroClick</h1>
+        <span id="farm-rank" class="text-[11px] font-bold text-emerald-100 opacity-90">Orto Familiare</span>
+      </div>
+    </div>
+
+    <!-- Saldi Monete e Semi d'Oro -->
+    <div class="flex items-center gap-2">
+      <div id="golden-seeds-badge" class="hidden bg-amber-900/60 border border-amber-300/60 px-2 py-1 rounded-xl flex items-center gap-1" title="Semi d'Oro (+10% guadagno ciascuno)">
+        <span class="text-sm">🌟</span>
+        <span id="ui-golden-seeds" class="font-game text-xs font-bold text-amber-300">0</span>
+      </div>
+
+      <div class="bg-emerald-950/60 border border-emerald-400/40 px-3 py-1 rounded-xl flex items-center gap-1.5 shadow-inner">
+        <span class="text-base">🪙</span>
+        <span id="ui-money" class="font-game text-base font-bold text-amber-300">0 €</span>
+      </div>
+
+      <button id="btn-sound" onclick="toggleSound()" class="w-8 h-8 rounded-xl bg-emerald-800 hover:bg-emerald-700 flex items-center justify-center text-sm border border-emerald-500/40" title="Audio">
+        🔇
+      </button>
+      <button onclick="openSettingsModal()" class="w-8 h-8 rounded-xl bg-emerald-800 hover:bg-emerald-700 flex items-center justify-center text-sm border border-emerald-500/40" title="Opzioni">
+        ⚙️
+      </button>
+    </div>
+  </header>
+
+  <!-- SEZIONE SUPERIORE: Statistiche rapide & Granaio / Mercato -->
+  <section class="px-3 pt-2 pb-1.5 bg-white/75 backdrop-blur-sm border-b border-amber-900/10 z-10">
+    <!-- Barra Granaio (Magazzino) -->
+    <div class="bg-amber-50 border-2 border-amber-300 rounded-2xl p-2 shadow-sm">
+      <div class="flex justify-between items-center text-xs font-extrabold text-amber-950 mb-1">
+        <div class="flex items-center gap-1.5">
+          <span class="text-base">🏚️</span>
+          <span>GRANAIO</span>
+          <span id="ui-auto-sell-tag" class="hidden bg-emerald-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">AUTO-VENDITA</span>
+        </div>
+        <div>
+          <span id="ui-barn-count" class="text-amber-700">0</span> / <span id="ui-barn-cap">25</span> unità
+          <span class="text-emerald-700 ml-1">(Valore: <span id="ui-barn-value">0 €</span>)</span>
+        </div>
+      </div>
+
+      <!-- Progress bar magazzino -->
+      <div class="w-full h-3 bg-amber-200/80 rounded-full overflow-hidden border border-amber-400/50 mb-2">
+        <div id="ui-barn-bar" class="h-full bg-gradient-to-r from-amber-500 to-orange-500 transition-all duration-150 rounded-full" style="width: 0%"></div>
+      </div>
+
+      <!-- Azioni principali: Raccogli a Mano + Vendi al Mercato -->
+      <div class="grid grid-cols-2 gap-2">
+        <button id="btn-manual-harvest" onclick="triggerManualHarvestButton(event)" class="btn-game bg-gradient-to-b from-lime-500 to-green-600 hover:from-lime-400 hover:to-green-500 text-white font-game font-bold py-2.5 px-2 rounded-xl shadow-[0_4px_0_#15803d] border border-lime-300 flex items-center justify-center gap-1.5 text-sm">
+          <span id="ui-tool-icon" class="text-lg inline-block">🧤</span>
+          <div class="text-left leading-tight">
+            <div>RACCOGLI</div>
+            <div id="ui-harvest-power" class="text-[10px] text-lime-100 font-sans font-bold">+1 / tocco</div>
+          </div>
+        </button>
+
+        <button id="btn-sell-market" onclick="sellAllCrops(event)" class="btn-game bg-gradient-to-b from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-amber-950 font-game font-bold py-2.5 px-2 rounded-xl shadow-[0_4px_0_#b45309] border border-amber-200 flex items-center justify-center gap-1.5 text-sm">
+          <span class="text-lg">🏪</span>
+          <div class="text-left leading-tight">
+            <div>VENDI TUTTO</div>
+            <div id="ui-sell-preview" class="text-[10px] text-amber-900 font-sans font-extrabold">+0 €</div>
+          </div>
+        </button>
+      </div>
+    </div>
+
+    <!-- Barra Statistiche Pasive (Al Secondo) -->
+    <div class="flex justify-between items-center mt-1.5 px-1 text-[11px] font-bold text-stone-700">
+      <div class="flex items-center gap-1">
+        <span>🌱 Coltura:</span>
+        <span id="ui-current-crop-name" class="text-emerald-800 font-extrabold">Grano</span>
+        <span id="ui-crop-price" class="text-amber-700">(2 €/u)</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span title="Raccolto automatico al secondo">🤖 <span id="ui-aps">0.0</span>/s</span>
+        <span title="Guadagno medio stimato">💰 <span id="ui-gps">0 €</span>/s</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- CAMPO AGRICOLO INTERATTIVO (Griglia Zolle Touch & Swipe) -->
+  <main class="px-3 py-2 flex-shrink-0">
+    <div class="flex justify-between items-center mb-1 px-1">
+      <span class="text-[11px] font-extrabold uppercase tracking-wider text-amber-900/80">
+        🌾 Il Tuo Campo (Tocca o Trascina il dito!)
+      </span>
+      <span id="ui-growth-speed-label" class="text-[11px] font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
+        Crescita: 1.0x
+      </span>
+    </div>
+
+    <div id="field-container" class="bg-gradient-to-b from-lime-700 to-green-800 p-2.5 rounded-2xl border-4 border-green-900 shadow-inner relative">
+      <div id="field-grid" class="grid grid-cols-3 gap-2">
+        <!-- Le zolle vengono generate dinamicamente via JS -->
+      </div>
+    </div>
+  </main>
+
+  <!-- NAVIGAZIONE TAB POTENZIAMENTI -->
+  <nav class="px-3 pt-1 flex gap-1.5 border-b-2 border-amber-900/15 bg-amber-50/80">
+    <button onclick="switchTab('tools')" id="tab-tools" class="tab-btn flex-1 py-2 px-1 rounded-t-xl font-game text-xs font-bold bg-white text-emerald-800 border-t-2 border-x-2 border-amber-300 shadow-sm">
+      🛠️ Strumenti
+    </button>
+    <button onclick="switchTab('auto')" id="tab-auto" class="tab-btn flex-1 py-2 px-1 rounded-t-xl font-game text-xs font-bold bg-amber-100/70 text-amber-900/70 border-t border-x border-transparent">
+      🚜 Macchine
+    </button>
+    <button onclick="switchTab('crops')" id="tab-crops" class="tab-btn flex-1 py-2 px-1 rounded-t-xl font-game text-xs font-bold bg-amber-100/70 text-amber-900/70 border-t border-x border-transparent">
+      🌽 Colture
+    </button>
+    <button onclick="switchTab('farm')" id="tab-farm" class="tab-btn flex-1 py-2 px-1 rounded-t-xl font-game text-xs font-bold bg-amber-100/70 text-amber-900/70 border-t border-x border-transparent">
+      🏡 Azienda
+    </button>
+  </nav>
+
+  <!-- CONTENUTO TAB SCORREVOLE -->
+  <section id="tab-content" class="flex-1 overflow-y-auto custom-scroll p-3 space-y-2.5 bg-white/90">
+    <!-- Popolato dinamicamente da renderShop() -->
+  </section>
+
+  <!-- TOAST / NOTIFICHE IN-GAME (Sostituisce alert) -->
+  <div id="toast-container" class="fixed top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-none flex flex-col items-center gap-1.5 w-11/12 max-w-[420px]"></div>
+
+  <!-- MODALE BENVENUTO / GUADAGNI OFFLINE -->
+  <div id="modal-offline" class="hidden fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-5 border-4 border-amber-400 shadow-2xl text-center animate-bounce-in">
+      <div class="text-5xl mb-2">☀️🚜</div>
+      <h2 class="font-game text-2xl text-emerald-800 mb-1">Bentornato in Fattoria!</h2>
+      <p class="text-xs text-stone-600 mb-3">Mentre eri via per <span id="offline-time" class="font-bold text-stone-800">0m</span>, i tuoi macchinari hanno continuato a lavorare!</p>
+      <div class="bg-amber-50 border-2 border-amber-300 rounded-2xl p-3 mb-4">
+        <div class="text-xs font-bold text-amber-900 uppercase">Raccolto & Vendite Offline</div>
+        <div id="offline-earnings" class="font-game text-2xl font-bold text-emerald-600 mt-1">+0 €</div>
+        <div id="offline-crops" class="text-xs text-amber-800 mt-0.5">+0 unità nel granaio</div>
+      </div>
+      <button onclick="closeOfflineModal()" class="btn-game w-full bg-gradient-to-b from-emerald-500 to-green-600 text-white font-game font-bold py-3 rounded-xl shadow-[0_4px_0_#15803d] text-base">
+        FANTASTICO!
+      </button>
+    </div>
+  </div>
+
+  <!-- MODALE IMPOSTAZIONI & RESET -->
+  <div id="modal-settings" class="hidden fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-5 border-4 border-stone-300 shadow-2xl">
+      <div class="flex justify-between items-center mb-3">
+        <h2 class="font-game text-xl text-stone-800">⚙️ Opzioni Fattoria</h2>
+        <button onclick="closeSettingsModal()" class="w-8 h-8 rounded-full bg-stone-200 text-stone-700 font-bold">✕</button>
+      </div>
+
+      <div class="space-y-3 text-sm text-stone-700">
+        <div class="bg-stone-100 p-3 rounded-2xl text-xs space-y-1">
+          <div><strong>Raccolti totali effettuati:</strong> <span id="stat-total-harvested">0</span></div>
+          <div><strong>Guadagni totali storici:</strong> <span id="stat-total-earned">0 €</span></div>
+          <div><strong>Semi d'Oro posseduti:</strong> <span id="stat-golden-seeds">0</span> (+<span id="stat-prestige-bonus">0</span>%)</div>
+        </div>
+
+        <button onclick="manualSave()" class="btn-game w-full bg-emerald-600 text-white font-game font-bold py-2.5 rounded-xl shadow-[0_3px_0_#065f46]">
+          💾 Salva Partita Ora
+        </button>
+
+        <div id="reset-confirm-box" class="pt-2 border-t border-stone-200">
+          <button id="btn-ask-reset" onclick="showResetConfirm()" class="w-full bg-red-100 hover:bg-red-200 text-red-700 font-bold py-2.5 rounded-xl text-xs">
+            🗑️ Azzera Tutti i Progressi
+          </button>
+          <div id="reset-confirm-actions" class="hidden space-y-2">
+            <p class="text-xs text-red-600 font-bold text-center">Sei sicuro? Perderai monete, potenziamenti e Semi d'Oro!</p>
+            <div class="grid grid-cols-2 gap-2">
+              <button onclick="hideResetConfirm()" class="bg-stone-200 text-stone-800 font-bold py-2 rounded-xl text-xs">Annulla</button>
+              <button onclick="hardResetGame()" class="bg-red-600 text-white font-bold py-2 rounded-xl text-xs">Sì, Azzera Tutto</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/**
+ * ============================================================================
+ * AGROCLICK - FATTORIA INCREMENTALE
+ * Logica di gioco completa: stato, colture, strumenti, automazione, prestigio.
+ * ============================================================================
+ */
+
+// --- DATI DI CONFIGURAZIONE DEL GIOCO ---
+
+const CROPS = [
+  { id: 'wheat', name: 'Grano Dorato', emoji: '🌾', sprout: '🌱', growTime: 2.2, basePrice: 2, unlockCost: 0, desc: 'Semplice, veloce e affidabile.' },
+  { id: 'carrot', name: 'Carote Croccanti', emoji: '🥕', sprout: '🌿', growTime: 3.0, basePrice: 6, unlockCost: 150, desc: 'Molto richieste al mercato locale.' },
+  { id: 'corn', name: 'Mais Dolce', emoji: '🌽', sprout: '🌱', growTime: 4.0, basePrice: 18, unlockCost: 900, desc: 'Pannocchie ricche e pesanti.' },
+  { id: 'tomato', name: 'Pomodori San Marzano', emoji: '🍅', sprout: '🌿', growTime: 5.0, basePrice: 55, unlockCost: 4500, desc: 'Oro rosso della campagna italiana.' },
+  { id: 'pumpkin', name: 'Zucche Giganti', emoji: '🎃', sprout: '🍀', growTime: 6.5, basePrice: 165, unlockCost: 22000, desc: 'Enormi e super redditizie.' },
+  { id: 'grape', name: 'Uva Pregiata', emoji: '🍇', sprout: '🌿', growTime: 8.0, basePrice: 520, unlockCost: 110000, desc: 'Per vini da esportazione.' },
+  { id: 'truffle', name: 'Tartufo Bianco', emoji: '🍄', sprout: '🤎', growTime: 10.0, basePrice: 1800, unlockCost: 600000, desc: 'Il tesoro più raro della terra.' }
+];
+
+const TOOLS = [
+  { id: 'hands', name: 'Mani Nude', icon: '🧤', power: 1, area: 1, cost: 0, desc: 'Raccogli una pianta alla volta a mano.' },
+  { id: 'sickle', name: 'Falcetto d\'Acciaio', icon: '🗡️', power: 2, area: 1, cost: 35, desc: 'Taglio netto: +2 unità per pianta!' },
+  { id: 'scythe', name: 'Falce Fienaia', icon: '🪓', power: 4, area: 2, cost: 220, desc: 'Raccoglie 2 zolle vicine insieme!' },
+  { id: 'mower', name: 'Motofalciatrice', icon: '🚜', power: 9, area: 3, cost: 1400, desc: 'Taglio rapido su 3 zolle adiacenti.' },
+  { id: 'harvester', name: 'Mietitrebbia Turbo', icon: '🚛', power: 22, area: 6, cost: 9500, desc: 'Falcia mezzo campo in un sol colpo!' },
+  { id: 'drones', name: 'Sciame Droni Laser', icon: '🛸', power: 60, area: 12, cost: 65000, desc: 'Raccoglie TUTTO il campo istantaneamente!' }
+];
+
+const AUTOMATION_ITEMS = [
+  { id: 'worker', name: 'Bracciante Agricolo', icon: '👨‍🌾', baseRate: 0.6, baseCost: 25, costMult: 1.18, desc: 'Raccoglie automaticamente le piante mature.' },
+  { id: 'sprinkler', name: 'Irrigatore Automatico', icon: '💦', baseRate: 0, growBonus: 0.15, baseCost: 80, costMult: 1.25, desc: 'Velocizza la crescita di tutte le colture (+15%).' },
+  { id: 'tractor', name: 'Trattore Compatto', icon: '🚜', baseRate: 3.2, baseCost: 450, costMult: 1.20, desc: 'Lavora instancabilmente giorno e notte.' },
+  { id: 'combine', name: 'Mietitrebbia Autonoma', icon: '⚙️', baseRate: 14.0, baseCost: 3800, costMult: 1.22, desc: 'Raccolta industriale ad altissima resa.' },
+  { id: 'ai_farm', name: 'Agri-Satellite IA', icon: '🛰️', baseRate: 65.0, baseCost: 32000, costMult: 1.25, desc: 'Gestione robotica totale della tenuta.' }
+];
+
+const MARKET_TIERS = [
+  { name: 'Bancarella di Paese', mult: 1.0, cost: 0 },
+  { name: 'Mercato Contadino', mult: 1.5, cost: 300 },
+  { name: 'Bottega Bio Locale', mult: 2.2, cost: 2000 },
+  { name: 'Catena Supermercati', mult: 3.5, cost: 15000 },
+  { name: 'Export Europeo', mult: 6.0, cost: 95000 },
+  { name: 'Esclusiva Globale Lusso', mult: 12.0, cost: 550000 }
+];
+
+// --- STATO DEL GIOCO ---
+let state = {
+  money: 0,
+  totalEarned: 0,
+  totalHarvested: 0,
+  goldenSeeds: 0,
+  barnCount: 0,
+  barnLevel: 1, // Capacità base = 25 * 1.6^(lvl-1)
+  fieldCols: 3,
+  fieldRows: 2, // Inizia con 6 zolle (3x2), espandibile fino a 12 (3x4)
+  selectedCropIndex: 0,
+  unlockedCrops: [0],
+  toolIndex: 0,
+  automation: {
+    worker: 0,
+    sprinkler: 0,
+    tractor: 0,
+    combine: 0,
+    ai_farm: 0
+  },
+  marketTier: 0,
+  autoSellUnlocked: false,
+  fertilizerLevel: 0,
+  soundEnabled: false,
+  lastSaveTime: Date.now()
+};
+
+// Stato dinamico delle singole zolle (array di oggetti { progress: 0..1 })
+let plots = [];
+let activeTab = 'tools';
+let isSwiping = false;
+let autoSellTimer = 0;
+
+// --- FORMATTAZIONE NUMERI IN ITALIANO ---
+function formatNumber(num) {
+  if (num < 1000) return Math.floor(num).toLocaleString('it-IT');
+  const units = ['', 'K', 'M', 'Mld', 'B', 'T', 'Qa'];
+  const tier = Math.floor(Math.log10(num) / 3);
+  if (tier >= units.length) return num.toExponential(2);
+  const scale = Math.pow(10, tier * 3);
+  const scaled = num / scale;
+  return scaled.toFixed(scaled < 10 ? 2 : 1).replace('.', ',') + ' ' + units[tier];
+}
+
+function formatMoney(num) {
+  return formatNumber(num) + ' €';
+}
+
+// --- CALCOLO STATISTICHE DERIVATE ---
+function getBarnCapacity() {
+  return Math.floor(25 * Math.pow(1.65, state.barnLevel - 1));
+}
+
+function getBarnUpgradeCost() {
+  return Math.floor(40 * Math.pow(1.85, state.barnLevel - 1));
+}
+
+function getFieldExpandCost() {
+  const totalPlots = state.fieldCols * state.fieldRows;
+  if (totalPlots >= 12) return null; // Max 12 zolle (3x4)
+  if (totalPlots === 6) return 180;
+  if (totalPlots === 9) return 2400;
+  return 10000;
+}
+
+function getPrestigeMultiplier() {
+  return 1 + (state.goldenSeeds * 0.15); // +15% per ogni Seme d'Oro
+}
+
+function getCurrentCrop() {
+  return CROPS[state.selectedCropIndex] || CROPS[0];
+}
+
+function getUnitSellPrice() {
+  const crop = getCurrentCrop();
+  const marketMult = MARKET_TIERS[state.marketTier].mult;
+  const prestigeMult = getPrestigeMultiplier();
+  return Math.max(1, Math.round(crop.basePrice * marketMult * prestigeMult));
+}
+
+function getGrowthSpeedMultiplier() {
+  const sprinklerBonus = state.automation.sprinkler * 0.15;
+  const fertBonus = state.fertilizerLevel * 0.20;
+  return 1 + sprinklerBonus + fertBonus;
+}
+
+function getHarvestPower() {
+  return TOOLS[state.toolIndex].power;
+}
+
+function getHarvestArea() {
+  return TOOLS[state.toolIndex].area;
+}
+
+function getAutoHarvestPerSecond() {
+  let total = 0;
+  AUTOMATION_ITEMS.forEach(item => {
+    if (item.baseRate > 0) {
+      total += (state.automation[item.id] || 0) * item.baseRate;
+    }
+  });
+  return total;
+}
+
+function getAutoItemCost(item) {
+  const count = state.automation[item.id] || 0;
+  return Math.floor(item.baseCost * Math.pow(item.costMult, count));
+}
+
+// --- AUDIO PROCEDURALE CON TONE.JS ---
+let synth = null;
+function initAudio() {
+  if (!synth && typeof Tone !== 'undefined') {
+    synth = new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: 'triangle' },
+      envelope: { attack: 0.01, decay: 0.1, sustain: 0.05, release: 0.15 }
+    }).toDestination();
+    synth.volume.value = -12;
+  }
+}
+
+function playSound(type) {
+  if (!state.soundEnabled) return;
+  try {
+    initAudio();
+    if (Tone.context.state !== 'running') Tone.start();
+    if (!synth) return;
+
+    if (type === 'harvest') {
+      const notes = ['C5', 'E5', 'G5'];
+      const note = notes[Math.floor(Math.random() * notes.length)];
+      synth.triggerAttackRelease(note, '32n');
+    } else if (type === 'sell') {
+      synth.triggerAttackRelease(['E5', 'G5', 'C6'], '16n');
+    } else if (type === 'upgrade') {
+      synth.triggerAttackRelease(['C5', 'F5', 'A5'], '16n');
+    } else if (type === 'full') {
+      synth.triggerAttackRelease('A3', '16n');
+    }
+  } catch (e) {
+    // Ignora errori audio su browser restrittivi
+  }
+}
+
+function toggleSound() {
+  state.soundEnabled = !state.soundEnabled;
+  if (state.soundEnabled) {
+    initAudio();
+    if (typeof Tone !== 'undefined' && Tone.context.state !== 'running') Tone.start();
+    showToast('🔊 Effetti sonori attivati!');
+  } else {
+    showToast('🔇 Audio disattivato');
+  }
+  updateHeaderUI();
+  saveGame();
+}
+
+// --- FEEDBACK VISIVO: NUMERI VOLANTI, PARTICELLA, TOAST ---
+function spawnFloatingText(x, y, text, color = '#fef08a', size = '1.05rem') {
+  const el = document.createElement('div');
+  el.className = 'floating-text';
+  el.textContent = text;
+  el.style.left = x + 'px';
+  el.style.top = y + 'px';
+  el.style.color = color;
+  el.style.fontSize = size;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 950);
+}
+
+function spawnParticles(x, y, emoji, count = 4) {
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle text-sm';
+    p.textContent = emoji;
+    p.style.left = x + 'px';
+    p.style.top = y + 'px';
+    const angle = (Math.PI * 2 * i) / count + (Math.random() * 0.5);
+    const dist = 25 + Math.random() * 35;
+    p.style.setProperty('--dx', Math.cos(angle) * dist + 'px');
+    p.style.setProperty('--dy', Math.sin(angle) * dist - 15 + 'px');
+    document.body.appendChild(p);
+    setTimeout(() => p.remove(), 650);
+  }
+}
+
+function showToast(msg, type = 'info') {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  const bg = type === 'warn' ? 'bg-amber-600 border-amber-300' : 'bg-emerald-800 border-emerald-400';
+  toast.className = `${bg} text-white text-xs font-bold px-3.5 py-2 rounded-full shadow-lg border transition-all duration-300 transform scale-95 opacity-0`;
+  toast.textContent = msg;
+  container.appendChild(toast);
+
+  requestAnimationFrame(() => {
+    toast.classList.remove('scale-95', 'opacity-0');
+    toast.classList.add('scale-100', 'opacity-100');
+  });
+
+  setTimeout(() => {
+    toast.classList.add('opacity-0', '-translate-y-2');
+    setTimeout(() => toast.remove(), 300);
+  }, 2200);
+}
+
+// --- INIZIALIZZAZIONE E GESTIONE DEL CAMPO (ZOLLE) ---
+function initPlots() {
+  const total = state.fieldCols * state.fieldRows;
+  while (plots.length < total) {
+    // Le nuove zolle partono quasi mature per gratificazione immediata
+    plots.push({ progress: 0.8 + Math.random() * 0.2 });
+  }
+  if (plots.length > total) {
+    plots = plots.slice(0, total);
+  }
+  renderFieldGrid();
+}
+
+function renderFieldGrid() {
+  const grid = document.getElementById('field-grid');
+  grid.innerHTML = '';
+  const crop = getCurrentCrop();
+
+  plots.forEach((plot, idx) => {
+    const div = document.createElement('div');
+    div.className = 'soil-plot h-20 sm:h-24 flex flex-col items-center justify-center cursor-pointer select-none';
+    div.dataset.index = idx;
+
+    // Indicatore visivo della pianta
+    const emojiSpan = document.createElement('span');
+    emojiSpan.className = 'crop-emoji text-3xl sm:text-4xl';
+    emojiSpan.id = `plot-emoji-${idx}`;
+    emojiSpan.textContent = plot.progress >= 1 ? crop.emoji : (plot.progress > 0.45 ? crop.sprout : '🌱');
+
+    // Mini barra di crescita nella zolla
+    const barWrap = document.createElement('div');
+    barWrap.className = 'w-4/5 h-1.5 bg-black/40 rounded-full mt-1.5 overflow-hidden';
+    const barFill = document.createElement('div');
+    barFill.id = `plot-bar-${idx}`;
+    barFill.className = 'h-full bg-lime-400 transition-all duration-100';
+    barFill.style.width = `${Math.min(100, plot.progress * 100)}%`;
+    barWrap.appendChild(barFill);
+
+    div.appendChild(emojiSpan);
+    div.appendChild(barWrap);
+
+    // Eventi Touch & Mouse per raccolta singola e swipe
+    div.addEventListener('pointerdown', (e) => {
+      isSwiping = true;
+      harvestPlot(idx, e.clientX, e.clientY);
+    });
+
+    grid.appendChild(div);
+  });
+
+  // Gestione swipe continuo su tutto il contenitore campo
+  const fieldContainer = document.getElementById('field-container');
+  fieldContainer.onpointermove = (e) => {
+    if (!isSwiping) return;
+    const target = document.elementFromPoint(e.clientX, e.clientY);
+    const plotEl = target ? target.closest('.soil-plot') : null;
+    if (plotEl && plotEl.dataset.index !== undefined) {
+      const idx = parseInt(plotEl.dataset.index, 10);
+      harvestPlot(idx, e.clientX, e.clientY);
+    }
+  };
+}
+
+window.addEventListener('pointerup', () => { isSwiping = false; });
+window.addEventListener('pointercancel', () => { isSwiping = false; });
+
+/**
+ * Raccoglie una zolla (e quelle adiacenti se lo strumento ha area > 1)
+ */
+function harvestPlot(centerIndex, clientX, clientY) {
+  const cap = getBarnCapacity();
+  if (state.barnCount >= cap) {
+    if (Math.random() < 0.25) {
+      showToast('⚠️ Granaio pieno! Vendi al mercato!', 'warn');
+      playSound('full');
+    }
+    return;
+  }
+
+  const area = getHarvestArea();
+  const power = getHarvestPower();
+  const crop = getCurrentCrop();
+  let harvestedAny = 0;
+
+  // Trova le zolle target: prima la zolla toccata, poi le altre mature entro l'area
+  const targets = [centerIndex];
+  if (area > 1) {
+    for (let i = 0; i < plots.length && targets.length < area; i++) {
+      if (i !== centerIndex && plots[i].progress >= 1) {
+        targets.push(i);
+      }
+    }
+  }
+
+  targets.forEach(idx => {
+    const plot = plots[idx];
+    if (plot && plot.progress >= 1 && state.barnCount < cap) {
+      plot.progress = 0; // Ripianta automaticamente
+      const spaceLeft = cap - state.barnCount;
+      const gained = Math.min(power, spaceLeft);
+      state.barnCount += gained;
+      state.totalHarvested += gained;
+      harvestedAny += gained;
+
+      // Animazione visiva sulla zolla
+      const plotEl = document.querySelector(`.soil-plot[data-index="${idx}"]`);
+      if (plotEl) {
+        plotEl.classList.add('harvested-anim');
+        setTimeout(() => plotEl.classList.remove('harvested-anim'), 140);
+      }
+    }
+  });
+
+  if (harvestedAny > 0) {
+    playSound('harvest');
+    const posX = clientX || window.innerWidth / 2;
+    const posY = clientY || window.innerHeight * 0.42;
+    spawnFloatingText(posX, posY - 10, `+${harvestedAny} ${crop.emoji}`, '#bef264', '1.15rem');
+    spawnParticles(posX, posY, crop.emoji, Math.min(6, 2 + area));
+    updatePlotsVisuals();
+    updateTopUI();
+  }
+}
+
+/**
+ * Pulsante grande "RACCOGLI" per chi preferisce tappare un solo bottone gigante
+ */
+function triggerManualHarvestButton(event) {
+  const iconEl = document.getElementById('ui-tool-icon');
+  iconEl.classList.remove('swing-anim');
+  void iconEl.offsetWidth; // trigger reflow
+  iconEl.classList.add('swing-anim');
+
+  const cap = getBarnCapacity();
+  if (state.barnCount >= cap) {
+    showToast('⚠️ Granaio pieno! Premi VENDI TUTTO!', 'warn');
+    playSound('full');
+    return;
+  }
+
+  // Trova la prima zolla matura
+  const matureIdx = plots.findIndex(p => p.progress >= 1);
+  if (matureIdx !== -1) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    harvestPlot(matureIdx, rect.left + rect.width / 2, rect.top);
+  } else {
+    // Se nessuna pianta è ancora matura, dà una piccola spinta alla crescita (+18%)!
+    plots.forEach(p => {
+      p.progress = Math.min(1, p.progress + 0.18);
+    });
+    const rect = event.currentTarget.getBoundingClientRect();
+    spawnFloatingText(rect.left + rect.width / 2, rect.top, '💧 Annaffiato!', '#7dd3fc', '0.9rem');
+    updatePlotsVisuals();
+  }
+}
+
+/**
+ * Vende tutto il raccolto presente nel Granaio
+ */
+function sellAllCrops(event) {
+  if (state.barnCount <= 0) {
+    showToast('Il granaio è vuoto! Raccogli prima le colture.', 'warn');
+    return;
+  }
+
+  const unitPrice = getUnitSellPrice();
+  const earnings = state.barnCount * unitPrice;
+  const soldUnits = state.barnCount;
+
+  state.money += earnings;
+  state.totalEarned += earnings;
+  state.barnCount = 0;
+
+  playSound('sell');
+
+  const x = event ? event.clientX : window.innerWidth * 0.72;
+  const y = event ? event.clientY : window.innerHeight * 0.22;
+  spawnFloatingText(x, y - 10, `+${formatMoney(earnings)}`, '#fde047', '1.3rem');
+  spawnParticles(x, y, '🪙', 6);
+
+  if (soldUnits >= 10) {
+    showToast(`Vendute ${formatNumber(soldUnits)} unità per ${formatMoney(earnings)}!`);
+  }
+
+  updateTopUI();
+  renderShop();
+}
+
+// --- LOOP PRINCIPALE DI GIOCO (60 FPS logici via delta time) ---
+let lastFrameTime = performance.now();
+let autoHarvestAccumulator = 0;
+
+function gameLoop(now) {
+  const dt = Math.min(0.5, (now - lastFrameTime) / 1000); // Max 0.5s per frame
+  lastFrameTime = now;
+
+  const crop = getCurrentCrop();
+  const growMult = getGrowthSpeedMultiplier();
+  const effectiveGrowTime = crop.growTime / growMult;
+
+  // 1. Crescita delle piante nelle zolle
+  for (let i = 0; i < plots.length; i++) {
+    if (plots[i].progress < 1) {
+      plots[i].progress = Math.min(1, plots[i].progress + (dt / effectiveGrowTime));
+    }
+  }
+
+  // 2. Raccolta Automatica (Braccianti, Trattori, Mietitrebbie, IA)
+  const autoRate = getAutoHarvestPerSecond();
+  if (autoRate > 0) {
+    autoHarvestAccumulator += autoRate * dt;
+    if (autoHarvestAccumulator >= 1) {
+      const harvestsToDo = Math.floor(autoHarvestAccumulator);
+      autoHarvestAccumulator -= harvestsToDo;
+      performAutoHarvest(harvestsToDo);
+    }
+  }
+
+  // 3. Vendita Automatica (se sbloccata)
+  if (state.autoSellUnlocked && state.barnCount > 0) {
+    autoSellTimer += dt;
+    if (autoSellTimer >= 1.5 || state.barnCount >= getBarnCapacity()) {
+      autoSellTimer = 0;
+      const earnings = state.barnCount * getUnitSellPrice();
+      state.money += earnings;
+      state.totalEarned += earnings;
+      state.barnCount = 0;
+    }
+  }
+
+  updatePlotsVisuals();
+  updateTopUI();
+
+  requestAnimationFrame(gameLoop);
+}
+
+function performAutoHarvest(units) {
+  const cap = getBarnCapacity();
+  if (state.barnCount >= cap) return;
+
+  // Raccoglie piante mature o estrae resa continua dai campi
+  let collected = 0;
+  for (let i = 0; i < plots.length && collected < units; i++) {
+    if (plots[i].progress >= 1) {
+      plots[i].progress = 0;
+      collected++;
+    }
+  }
+
+  // Se i macchinari sono più veloci delle singole zolle, generano comunque raccolto proporzionale
+  const bonusYield = Math.max(collected, Math.ceil(units * 0.75));
+  const actualAdded = Math.min(cap - state.barnCount, bonusYield);
+
+  if (actualAdded > 0) {
+    state.barnCount += actualAdded;
+    state.totalHarvested += actualAdded;
+  }
+}
+
+// --- AGGIORNAMENTO INTERFACCIA UTENTE (DOM) ---
+function updatePlotsVisuals() {
+  const crop = getCurrentCrop();
+  for (let i = 0; i < plots.length; i++) {
+    const plot = plots[i];
+    const plotEl = document.querySelector(`.soil-plot[data-index="${i}"]`);
+    const emojiEl = document.getElementById(`plot-emoji-${i}`);
+    const barEl = document.getElementById(`plot-bar-${i}`);
+    if (!plotEl || !emojiEl || !barEl) continue;
+
+    if (plot.progress >= 1) {
+      if (!plotEl.classList.contains('mature')) {
+        plotEl.classList.add('mature');
+        emojiEl.textContent = crop.emoji;
+        emojiEl.style.transform = 'scale(1.12)';
+        barEl.className = 'h-full bg-amber-400';
+      }
+      barEl.style.width = '100%';
+    } else {
+      plotEl.classList.remove('mature');
+      emojiEl.textContent = plot.progress > 0.45 ? crop.sprout : '🌱';
+      const scale = 0.65 + (plot.progress * 0.4);
+      emojiEl.style.transform = `scale(${scale.toFixed(2)})`;
+      barEl.className = 'h-full bg-lime-400';
+      barEl.style.width = `${Math.floor(plot.progress * 100)}%`;
+    }
+  }
+}
+
+function updateHeaderUI() {
+  document.getElementById('ui-money').textContent = formatMoney(state.money);
+  document.getElementById('btn-sound').textContent = state.soundEnabled ? '🔊' : '🔇';
+
+  const gsBadge = document.getElementById('golden-seeds-badge');
+  if (state.goldenSeeds > 0) {
+    gsBadge.classList.remove('hidden');
+    document.getElementById('ui-golden-seeds').textContent = formatNumber(state.goldenSeeds);
+  } else {
+    gsBadge.classList.add('hidden');
+  }
+
+  // Titolo fattoria in base ai guadagni totali
+  let rank = 'Orto Familiare';
+  if (state.totalEarned >= 1000000) rank = 'Impero Agroalimentare';
+  else if (state.totalEarned >= 100000) rank = 'Tenuta Internazionale';
+  else if (state.totalEarned >= 15000) rank = 'Azienda Agricola Moderna';
+  else if (state.totalEarned >= 1500) rank = 'Fattoria Ben Avviata';
+  else if (state.totalEarned >= 200) rank = 'Piccolo Coltivatore';
+  document.getElementById('farm-rank').textContent = rank;
+}
+
+function updateTopUI() {
+  updateHeaderUI();
+
+  const cap = getBarnCapacity();
+  const unitPrice = getUnitSellPrice();
+  const barnVal = state.barnCount * unitPrice;
+  const pct = Math.min(100, (state.barnCount / cap) * 100);
+
+  document.getElementById('ui-barn-count').textContent = formatNumber(state.barnCount);
+  document.getElementById('ui-barn-cap').textContent = formatNumber(cap);
+  document.getElementById('ui-barn-value').textContent = formatMoney(barnVal);
+  document.getElementById('ui-barn-bar').style.width = `${pct}%`;
+
+  const autoTag = document.getElementById('ui-auto-sell-tag');
+  if (state.autoSellUnlocked) autoTag.classList.remove('hidden');
+  else autoTag.classList.add('hidden');
+
+  // Pulsante Raccogli
+  const tool = TOOLS[state.toolIndex];
+  document.getElementById('ui-tool-icon').textContent = tool.icon;
+  document.getElementById('ui-harvest-power').textContent = `+${tool.power} u • ${tool.area} zolle`;
+
+  // Pulsante Vendi
+  const sellBtn = document.getElementById('btn-sell-market');
+  sellBtn.disabled = state.barnCount <= 0;
+  document.getElementById('ui-sell-preview').textContent = `+${formatMoney(barnVal)}`;
+
+  // Statistiche riga inferiore
+  const crop = getCurrentCrop();
+  document.getElementById('ui-current-crop-name').textContent = `${crop.emoji} ${crop.name}`;
+  document.getElementById('ui-crop-price').textContent = `(${formatMoney(unitPrice)}/u)`;
+
+  const aps = getAutoHarvestPerSecond();
+  document.getElementById('ui-aps').textContent = aps.toFixed(1).replace('.', ',');
+  document.getElementById('ui-gps').textContent = formatMoney(aps * unitPrice);
+
+  document.getElementById('ui-growth-speed-label').textContent = `Crescita: ${getGrowthSpeedMultiplier().toFixed(2).replace('.', ',')}x`;
+}
+
+// --- SISTEMA TAB E NEGOZIO POTENZIAMENTI ---
+function switchTab(tabName) {
+  activeTab = tabName;
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.className = 'tab-btn flex-1 py-2 px-1 rounded-t-xl font-game text-xs font-bold bg-amber-100/70 text-amber-900/70 border-t border-x border-transparent transition-colors';
+  });
+  const activeBtn = document.getElementById(`tab-${tabName}`);
+  activeBtn.className = 'tab-btn flex-1 py-2 px-1 rounded-t-xl font-game text-xs font-bold bg-white text-emerald-800 border-t-2 border-x-2 border-amber-300 shadow-sm';
+  renderShop();
+}
+
+function renderShop() {
+  const container = document.getElementById('tab-content');
+  container.innerHTML = '';
+
+  if (activeTab === 'tools') {
+    renderToolsTab(container);
+  } else if (activeTab === 'auto') {
+    renderAutoTab(container);
+  } else if (activeTab === 'crops') {
+    renderCropsTab(container);
+  } else if (activeTab === 'farm') {
+    renderFarmTab(container);
+  }
+}
+
+function renderToolsTab(container) {
+  const currentTool = TOOLS[state.toolIndex];
+  const nextTool = TOOLS[state.toolIndex + 1];
+
+  // Card Strumento Attuale + Prossimo Upgrade
+  const card = document.createElement('div');
+  card.className = 'bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-3 shadow-xs';
+  card.innerHTML = `
+    <div class="flex items-center gap-3 mb-2">
+      <div class="w-12 h-12 rounded-2xl bg-emerald-600 text-white text-2xl flex items-center justify-center shadow">
+        ${currentTool.icon}
+      </div>
+      <div class="flex-1">
+        <div class="text-[10px] font-extrabold uppercase text-emerald-700">Attrezzatura Attuale</div>
+        <div class="font-game text-base font-bold text-stone-800">${currentTool.name}</div>
+        <div class="text-xs text-stone-600">${currentTool.desc}</div>
+      </div>
+    </div>
+  `;
+
+  if (nextTool) {
+    const canBuy = state.money >= nextTool.cost;
+    const btn = document.createElement('button');
+    btn.disabled = !canBuy;
+    btn.className = `btn-game w-full mt-1 py-2.5 px-3 rounded-xl font-game font-bold text-sm flex items-center justify-between ${
+      canBuy ? 'bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-[0_3px_0_#15803d]' : 'bg-stone-200 text-stone-500'
+    }`;
+    btn.innerHTML = `
+      <span>⬆️ Migliora in: ${nextTool.icon} ${nextTool.name}</span>
+      <span class="bg-black/20 px-2.5 py-1 rounded-lg text-xs">${formatMoney(nextTool.cost)}</span>
+    `;
+    btn.onclick = () => {
+      if (state.money >= nextTool.cost) {
+        state.money -= nextTool.cost;
+        state.toolIndex++;
+        playSound('upgrade');
+        showToast(`Nuovo strumento: ${nextTool.name}!`);
+        updateTopUI();
+        renderShop();
+        saveGame();
+      }
+    };
+    card.appendChild(btn);
+  } else {
+    card.innerHTML += `<div class="text-center text-xs font-bold text-emerald-700 bg-emerald-100 py-2 rounded-xl mt-2">✨ Livello Massimo Raggiunto!</div>`;
+  }
+  container.appendChild(card);
+
+  // Potenziamento Fertilizzante (Velocità crescita)
+  const fertCost = Math.floor(60 * Math.pow(1.9, state.fertilizerLevel));
+  const canBuyFert = state.money >= fertCost;
+  const fertCard = document.createElement('div');
+  fertCard.className = 'bg-amber-50/80 border-2 border-amber-200 rounded-2xl p-3 flex items-center justify-between gap-2';
+  fertCard.innerHTML = `
+    <div class="flex items-center gap-2.5">
+      <div class="w-11 h-11 rounded-xl bg-amber-500 text-white text-2xl flex items-center justify-center shadow">🧪</div>
+      <div>
+        <div class="font-game text-sm font-bold text-stone-800">Fertilizzante Organico <span class="text-xs text-amber-700">Lv.${state.fertilizerLevel}</span></div>
+        <div class="text-[11px] text-stone-600">Velocità crescita piante +20%</div>
+      </div>
+    </div>
+  `;
+  const fertBtn = document.createElement('button');
+  fertBtn.disabled = !canBuyFert;
+  fertBtn.className = `btn-game px-3 py-2 rounded-xl font-game font-bold text-xs shrink-0 ${
+    canBuyFert ? 'bg-amber-500 text-amber-950 shadow-[0_3px_0_#b45309]' : 'bg-stone-200 text-stone-500'
+  }`;
+  fertBtn.textContent = formatMoney(fertCost);
+  fertBtn.onclick = () => {
+    if (state.money >= fertCost) {
+      state.money -= fertCost;
+      state.fertilizerLevel++;
+      playSound('upgrade');
+      updateTopUI();
+      renderShop();
+      saveGame();
+    }
+  };
+  fertCard.appendChild(fertBtn);
+  container.appendChild(fertCard);
+}
+
+function renderAutoTab(container) {
+  AUTOMATION_ITEMS.forEach(item => {
+    const count = state.automation[item.id] || 0;
+    const cost = getAutoItemCost(item);
+    const canBuy = state.money >= cost;
+
+    const row = document.createElement('div');
+    row.className = 'bg-white border-2 border-stone-200 rounded-2xl p-2.5 flex items-center justify-between gap-2 shadow-2xs';
+
+    const effectText = item.baseRate > 0
+      ? `+${item.baseRate} raccolti/sec (Tot: ${(count * item.baseRate).toFixed(1)}/s)`
+      : `+15% velocità crescita (Tot: +${count * 15}%)`;
+
+    row.innerHTML = `
+      <div class="flex items-center gap-2.5">
+        <div class="w-11 h-11 rounded-xl bg-sky-100 border border-sky-300 text-2xl flex items-center justify-center relative">
+          ${item.icon}
+          <span class="absolute -top-1.5 -right-1.5 bg-sky-700 text-white text-[10px] font-extrabold px-1.5 rounded-full">${count}</span>
+        </div>
+        <div>
+          <div class="font-game text-sm font-bold text-stone-800">${item.name}</div>
+          <div class="text-[11px] font-bold text-emerald-700">${effectText}</div>
+          <div class="text-[10px] text-stone-500">${item.desc}</div>
+        </div>
+      </div>
+    `;
+
+    const btn = document.createElement('button');
+    btn.disabled = !canBuy;
+    btn.className = `btn-game px-3 py-2.5 rounded-xl font-game font-bold text-xs shrink-0 ${
+      canBuy ? 'bg-sky-600 text-white shadow-[0_3px_0_#0369a1]' : 'bg-stone-200 text-stone-500'
+    }`;
+    btn.textContent = formatMoney(cost);
+    btn.onclick = () => {
+      if (state.money >= cost) {
+        state.money -= cost;
+        state.automation[item.id] = count + 1;
+        playSound('upgrade');
+        updateTopUI();
+        renderShop();
+        saveGame();
+      }
+    };
+
+    row.appendChild(btn);
+    container.appendChild(row);
+  });
+}
+
+function renderCropsTab(container) {
+  CROPS.forEach((crop, idx) => {
+    const isUnlocked = state.unlockedCrops.includes(idx);
+    const isSelected = state.selectedCropIndex === idx;
+    const marketMult = MARKET_TIERS[state.marketTier].mult * getPrestigeMultiplier();
+    const actualPrice = Math.max(1, Math.round(crop.basePrice * marketMult));
+
+    const row = document.createElement('div');
+    row.className = `border-2 rounded-2xl p-2.5 flex items-center justify-between gap-2 ${
+      isSelected ? 'bg-emerald-50 border-emerald-500' : 'bg-white border-stone-200'
+    }`;
+
+    row.innerHTML = `
+      <div class="flex items-center gap-2.5">
+        <div class="w-11 h-11 rounded-xl bg-amber-100 text-2xl flex items-center justify-center border border-amber-300">
+          ${crop.emoji}
+        </div>
+        <div>
+          <div class="font-game text-sm font-bold text-stone-800 flex items-center gap-1.5">
+            <span>${crop.name}</span>
+            ${isSelected ? '<span class="text-[10px] bg-emerald-600 text-white px-1.5 py-0.5 rounded-full">IN COLTIVAZIONE</span>' : ''}
+          </div>
+          <div class="text-[11px] font-bold text-amber-700">Valore: ${formatMoney(actualPrice)}/u • Tempo: ${crop.growTime}s</div>
+          <div class="text-[10px] text-stone-500">${crop.desc}</div>
+        </div>
+      </div>
+    `;
+
+    const btn = document.createElement('button');
+    if (isUnlocked) {
+      btn.disabled = isSelected;
+      btn.className = `btn-game px-3 py-2 rounded-xl font-game font-bold text-xs shrink-0 ${
+        isSelected ? 'bg-emerald-200 text-emerald-800' : 'bg-emerald-600 text-white shadow-[0_3px_0_#15803d]'
+      }`;
+      btn.textContent = isSelected ? 'Attiva' : 'Semina';
+      btn.onclick = () => {
+        state.selectedCropIndex = idx;
+        playSound('harvest');
+        showToast(`Ora coltivi: ${crop.emoji} ${crop.name}!`);
+        updatePlotsVisuals();
+        updateTopUI();
+        renderShop();
+        saveGame();
+      };
+    } else {
+      const canBuy = state.money >= crop.unlockCost;
+      btn.disabled = !canBuy;
+      btn.className = `btn-game px-3 py-2 rounded-xl font-game font-bold text-xs shrink-0 ${
+        canBuy ? 'bg-amber-500 text-amber-950 shadow-[0_3px_0_#b45309]' : 'bg-stone-200 text-stone-500'
+      }`;
+      btn.innerHTML = `🔓 ${formatMoney(crop.unlockCost)}`;
+      btn.onclick = () => {
+        if (state.money >= crop.unlockCost) {
+          state.money -= crop.unlockCost;
+          state.unlockedCrops.push(idx);
+          state.selectedCropIndex = idx;
+          playSound('upgrade');
+          showToast(`Sbloccato: ${crop.emoji} ${crop.name}!`);
+          updatePlotsVisuals();
+          updateTopUI();
+          renderShop();
+          saveGame();
+        }
+      };
+    }
+
+    row.appendChild(btn);
+    container.appendChild(row);
+  });
+}
+
+function renderFarmTab(container) {
+  // 1. Espansione Granaio
+  const barnCost = getBarnUpgradeCost();
+  const nextCap = Math.floor(25 * Math.pow(1.65, state.barnLevel));
+  const canBuyBarn = state.money >= barnCost;
+  const barnDiv = document.createElement('div');
+  barnDiv.className = 'bg-white border-2 border-stone-200 rounded-2xl p-3 flex items-center justify-between gap-2';
+  barnDiv.innerHTML = `
+    <div class="flex items-center gap-2.5">
+      <div class="w-11 h-11 rounded-xl bg-amber-100 text-2xl flex items-center justify-center">🏚️</div>
+      <div>
+        <div class="font-game text-sm font-bold text-stone-800">Amplia Granaio (Lv.${state.barnLevel})</div>
+        <div class="text-[11px] text-stone-600">Capacità: ${formatNumber(getBarnCapacity())} ➔ <strong>${formatNumber(nextCap)}</strong> unità</div>
+      </div>
+    </div>
+  `;
+  const barnBtn = document.createElement('button');
+  barnBtn.disabled = !canBuyBarn;
+  barnBtn.className = `btn-game px-3 py-2 rounded-xl font-game font-bold text-xs shrink-0 ${
+    canBuyBarn ? 'bg-amber-500 text-amber-950 shadow-[0_3px_0_#b45309]' : 'bg-stone-200 text-stone-500'
+  }`;
+  barnBtn.textContent = formatMoney(barnCost);
+  barnBtn.onclick = () => {
+    if (state.money >= barnCost) {
+      state.money -= barnCost;
+      state.barnLevel++;
+      playSound('upgrade');
+      updateTopUI();
+      renderShop();
+      saveGame();
+    }
+  };
+  barnDiv.appendChild(barnBtn);
+  container.appendChild(barnDiv);
+
+  // 2. Espansione Campo (Più zolle)
+  const fieldCost = getFieldExpandCost();
+  const fieldDiv = document.createElement('div');
+  fieldDiv.className = 'bg-white border-2 border-stone-200 rounded-2xl p-3 flex items-center justify-between gap-2';
+  const currentPlots = state.fieldCols * state.fieldRows;
+  fieldDiv.innerHTML = `
+    <div class="flex items-center gap-2.5">
+      <div class="w-11 h-11 rounded-xl bg-green-100 text-2xl flex items-center justify-center">🟩</div>
+      <div>
+        <div class="font-game text-sm font-bold text-stone-800">Espandi Terreno (${currentPlots}/12 zolle)</div>
+        <div class="text-[11px] text-stone-600">${fieldCost ? 'Aggiungi +3 nuove zolle coltivabili' : 'Estensione massima raggiunta!'}</div>
+      </div>
+    </div>
+  `;
+  if (fieldCost) {
+    const canBuyField = state.money >= fieldCost;
+    const fBtn = document.createElement('button');
+    fBtn.disabled = !canBuyField;
+    fBtn.className = `btn-game px-3 py-2 rounded-xl font-game font-bold text-xs shrink-0 ${
+      canBuyField ? 'bg-emerald-600 text-white shadow-[0_3px_0_#15803d]' : 'bg-stone-200 text-stone-500'
+    }`;
+    fBtn.textContent = formatMoney(fieldCost);
+    fBtn.onclick = () => {
+      if (state.money >= fieldCost) {
+        state.money -= fieldCost;
+        state.fieldRows++;
+        initPlots();
+        playSound('upgrade');
+        showToast('Terreno ampliato! +3 zolle!');
+        renderShop();
+        saveGame();
+      }
+    };
+    fieldDiv.appendChild(fBtn);
+  }
+  container.appendChild(fieldDiv);
+
+  // 3. Canale di Vendita (Moltiplicatore Prezzo)
+  const currentMarket = MARKET_TIERS[state.marketTier];
+  const nextMarket = MARKET_TIERS[state.marketTier + 1];
+  const mktDiv = document.createElement('div');
+  mktDiv.className = 'bg-white border-2 border-stone-200 rounded-2xl p-3 flex items-center justify-between gap-2';
+  mktDiv.innerHTML = `
+    <div class="flex items-center gap-2.5">
+      <div class="w-11 h-11 rounded-xl bg-yellow-100 text-2xl flex items-center justify-center">🏪</div>
+      <div>
+        <div class="font-game text-sm font-bold text-stone-800">${currentMarket.name} (${currentMarket.mult}x)</div>
+        <div class="text-[11px] text-stone-600">${nextMarket ? `Prossimo: ${nextMarket.name} (${nextMarket.mult}x prezzi)` : 'Canale commerciale massimo!'}</div>
+      </div>
+    </div>
+  `;
+  if (nextMarket) {
+    const canBuyMkt = state.money >= nextMarket.cost;
+    const mBtn = document.createElement('button');
+    mBtn.disabled = !canBuyMkt;
+    mBtn.className = `btn-game px-3 py-2 rounded-xl font-game font-bold text-xs shrink-0 ${
+      canBuyMkt ? 'bg-amber-500 text-amber-950 shadow-[0_3px_0_#b45309]' : 'bg-stone-200 text-stone-500'
+    }`;
+    mBtn.textContent = formatMoney(nextMarket.cost);
+    mBtn.onclick = () => {
+      if (state.money >= nextMarket.cost) {
+        state.money -= nextMarket.cost;
+        state.marketTier++;
+        playSound('upgrade');
+        showToast(`Contratto firmato: ${nextMarket.name}!`);
+        updateTopUI();
+        renderShop();
+        saveGame();
+      }
+    };
+    mktDiv.appendChild(mBtn);
+  }
+  container.appendChild(mktDiv);
+
+  // 4. Vendita Automatica
+  if (!state.autoSellUnlocked) {
+    const autoSellCost = 2500;
+    const canBuyAuto = state.money >= autoSellCost;
+    const asDiv = document.createElement('div');
+    asDiv.className = 'bg-sky-50 border-2 border-sky-200 rounded-2xl p-3 flex items-center justify-between gap-2';
+    asDiv.innerHTML = `
+      <div class="flex items-center gap-2.5">
+        <div class="w-11 h-11 rounded-xl bg-sky-500 text-white text-2xl flex items-center justify-center">🚚</div>
+        <div>
+          <div class="font-game text-sm font-bold text-stone-800">Corriere Vendita Automatica</div>
+          <div class="text-[11px] text-stone-600">Vende automaticamente il raccolto dal granaio!</div>
+        </div>
+      </div>
+    `;
+    const asBtn = document.createElement('button');
+    asBtn.disabled = !canBuyAuto;
+    asBtn.className = `btn-game px-3 py-2 rounded-xl font-game font-bold text-xs shrink-0 ${
+      canBuyAuto ? 'bg-sky-600 text-white shadow-[0_3px_0_#0369a1]' : 'bg-stone-200 text-stone-500'
+    }`;
+    asBtn.textContent = formatMoney(autoSellCost);
+    asBtn.onclick = () => {
+      if (state.money >= autoSellCost) {
+        state.money -= autoSellCost;
+        state.autoSellUnlocked = true;
+        playSound('upgrade');
+        showToast('🚚 Vendita automatica attivata!');
+        updateTopUI();
+        renderShop();
+        saveGame();
+      }
+    };
+    asDiv.appendChild(asBtn);
+    container.appendChild(asDiv);
+  }
+
+  // 5. Sistema Prestigio: Nuova Stagione (Semi d'Oro)
+  const potentialSeeds = Math.floor(Math.sqrt(state.totalEarned / 25000));
+  const prestigeDiv = document.createElement('div');
+  prestigeDiv.className = 'bg-gradient-to-br from-amber-100 to-yellow-200 border-2 border-amber-400 rounded-2xl p-3 mt-2';
+  prestigeDiv.innerHTML = `
+    <div class="flex items-center gap-2 mb-1.5">
+      <span class="text-2xl">🌟</span>
+      <div>
+        <div class="font-game text-sm font-bold text-amber-950">Nuova Stagione Agricola (Prestigio)</div>
+        <div class="text-[11px] text-amber-900">Ricomincia da zero per ottenere <strong>Semi d'Oro</strong> (+15% guadagno permanente ciascuno).</div>
+      </div>
+    </div>
+    <div class="text-xs font-bold text-amber-950 bg-white/60 rounded-xl p-2 mb-2 flex justify-between">
+      <span>Semi d'Oro attuali: ${state.goldenSeeds} (+${state.goldenSeeds * 15}%)</span>
+      <span class="text-emerald-700">Ottenibili ora: +${potentialSeeds} 🌟</span>
+    </div>
+  `;
+  const pBtn = document.createElement('button');
+  pBtn.disabled = potentialSeeds < 1;
+  pBtn.className = `btn-game w-full py-2.5 rounded-xl font-game font-bold text-xs ${
+    potentialSeeds >= 1 ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-[0_3px_0_#b45309]' : 'bg-stone-300/70 text-stone-500'
+  }`;
+  pBtn.textContent = potentialSeeds >= 1
+    ? `🌟 Inizia Nuova Stagione (+${potentialSeeds} Semi d'Oro)`
+    : 'Guadagna almeno 25.000 € totali per sbloccare';
+  pBtn.onclick = () => {
+    if (potentialSeeds >= 1) {
+      triggerPrestige(potentialSeeds);
+    }
+  };
+  prestigeDiv.appendChild(pBtn);
+  container.appendChild(prestigeDiv);
+}
+
+function triggerPrestige(earnedSeeds) {
+  const keepSound = state.soundEnabled;
+  const newGoldenSeeds = state.goldenSeeds + earnedSeeds;
+
+  state = {
+    money: 0,
+    totalEarned: 0,
+    totalHarvested: 0,
+    goldenSeeds: newGoldenSeeds,
+    barnCount: 0,
+    barnLevel: 1,
+    fieldCols: 3,
+    fieldRows: 2,
+    selectedCropIndex: 0,
+    unlockedCrops: [0],
+    toolIndex: 0,
+    automation: { worker: 0, sprinkler: 0, tractor: 0, combine: 0, ai_farm: 0 },
+    marketTier: 0,
+    autoSellUnlocked: false,
+    fertilizerLevel: 0,
+    soundEnabled: keepSound,
+    lastSaveTime: Date.now()
+  };
+
+  plots = [];
+  initPlots();
+  playSound('sell');
+  showToast(`🌟 Nuova Stagione! Hai ora ${newGoldenSeeds} Semi d'Oro!`);
+  updateTopUI();
+  renderShop();
+  saveGame();
+}
+
+// --- SALVATAGGIO, CARICAMENTO E GUADAGNI OFFLINE ---
+const SAVE_KEY = 'agroclick_save_v1';
+
+function saveGame() {
+  try {
+    state.lastSaveTime = Date.now();
+    localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+  } catch (e) {
+    // Fallback silenzioso se localStorage non disponibile
+  }
+}
+
+function manualSave() {
+  saveGame();
+  showToast('💾 Partita salvata con successo!');
+}
+
+function loadGame() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+    state = { ...state, ...saved };
+    if (saved.automation) {
+      state.automation = { ...state.automation, ...saved.automation };
+    }
+
+    // Calcolo guadagni offline (max 8 ore)
+    const now = Date.now();
+    const elapsedSec = Math.min(8 * 3600, Math.floor((now - (state.lastSaveTime || now)) / 1000));
+    const autoRate = getAutoHarvestPerSecond();
+
+    if (elapsedSec > 60 && autoRate > 0) {
+      const offlineUnits = Math.floor(autoRate * elapsedSec * 0.5); // Resa offline 50%
+      if (offlineUnits > 0) {
+        const unitPrice = getUnitSellPrice();
+        let offlineMoney = 0;
+        let addedBarn = 0;
+
+        if (state.autoSellUnlocked) {
+          offlineMoney = offlineUnits * unitPrice;
+          state.money += offlineMoney;
+          state.totalEarned += offlineMoney;
+        } else {
+          const cap = getBarnCapacity();
+          addedBarn = Math.min(cap - state.barnCount, offlineUnits);
+          state.barnCount += addedBarn;
+        }
+        state.totalHarvested += offlineUnits;
+
+        if (offlineMoney > 0 || addedBarn > 0) {
+          const mins = Math.floor(elapsedSec / 60);
+          const timeText = mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`;
+          document.getElementById('offline-time').textContent = timeText;
+          document.getElementById('offline-earnings').textContent = `+${formatMoney(offlineMoney)}`;
+          document.getElementById('offline-crops').textContent = addedBarn > 0
+            ? `+${formatNumber(addedBarn)} unità stoccate nel granaio`
+            : `${formatNumber(offlineUnits)} unità vendute automaticamente`;
+          document.getElementById('modal-offline').classList.remove('hidden');
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Errore caricamento salvataggio:', e);
+  }
+}
+
+function closeOfflineModal() {
+  document.getElementById('modal-offline').classList.add('hidden');
+}
+
+function openSettingsModal() {
+  document.getElementById('stat-total-harvested').textContent = formatNumber(state.totalHarvested);
+  document.getElementById('stat-total-earned').textContent = formatMoney(state.totalEarned);
+  document.getElementById('stat-golden-seeds').textContent = formatNumber(state.goldenSeeds);
+  document.getElementById('stat-prestige-bonus').textContent = state.goldenSeeds * 15;
+  hideResetConfirm();
+  document.getElementById('modal-settings').classList.remove('hidden');
+}
+
+function closeSettingsModal() {
+  document.getElementById('modal-settings').classList.add('hidden');
+}
+
+function showResetConfirm() {
+  document.getElementById('btn-ask-reset').classList.add('hidden');
+  document.getElementById('reset-confirm-actions').classList.remove('hidden');
+}
+
+function hideResetConfirm() {
+  document.getElementById('btn-ask-reset').classList.remove('hidden');
+  document.getElementById('reset-confirm-actions').classList.add('hidden');
+}
+
+function hardResetGame() {
+  localStorage.removeItem(SAVE_KEY);
+  location.reload();
+}
+
+// --- AVVIO APPLICAZIONE ---
+window.onload = function () {
+  loadGame();
+  initPlots();
+  updateTopUI();
+  renderShop();
+
+  // Salvataggio automatico ogni 10 secondi
+  setInterval(saveGame, 10000);
+
+  // Aggiornamento pulsanti negozio ogni 500ms per abilitare gli acquisti appena si hanno i soldi
+  setInterval(() => {
+    renderShop();
+  }, 600);
+
+  // Avvio del game loop
+  lastFrameTime = performance.now();
+  requestAnimationFrame(gameLoop);
+};
+</script>
+</body>
+</html>
